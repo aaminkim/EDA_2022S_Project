@@ -1,0 +1,189 @@
+---
+title: "Fama-French 5 Factor Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+---
+F.F. Factor Returns
+===
+
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(dplyr)
+library(readr)
+library(rvest)
+library(readxl)
+library(writexl)
+library(stringr)
+library(magrittr)
+library(ggplot2)
+library(plotly)
+library(lubridate)
+library(frenchdata)
+library(zoo)
+library(tidyr)
+library(RColorBrewer)
+library(ggrepel)
+library(data.table)
+library(esquisse)
+library(ggthemes)
+library(highcharter)
+library(quantmod)
+library(stargazer)
+library(ggeffects)
+library(sjPlot)
+library(sjmisc)
+library(sjlabelled)
+
+FF_List <- read_xlsx("FF List.xlsx")
+
+get.ff.data.1 <- function(Factor){
+  
+  Name1 <- as.character(FF_List[which(FF_List$Code == Factor),"Name"])
+  assign("Data1", download_french_data(Name1))
+  
+  return(Data1$subsets$data[[1]])
+  
+}
+
+Factor_Single <- list("MKT","SMB","MKT","SMB","HML","RMW","CMA","WML","EP","CFP","DIV","ACC","NSI","VAR","RVAR")
+
+for (i in Factor_Single){
+    
+  out <- get.ff.data.1(i)%>% 
+    mutate(date = sub("(\\d{4})", "\\1-", date)) %>% 
+    mutate(date = as.Date(as.yearmon(date), frac = 1)) %>%
+    mutate(across(-date, ~. / 100)) %>%
+    mutate(across(-date, ~log(1+.))) %>%
+    mutate(across(-date, ~cumsum(.)))
+  
+  out1 <- out[,(ncol(out)-9):ncol(out)] 
+  
+  out2 <- cbind(out[,1],out1) %>% 
+    pivot_longer(names_to = 'key', values_to = 'value', -date)
+  
+  FF.Data.Name <- str_c("FF_",i,"_1_MO")
+
+  assign(FF.Data.Name, out2)
+    
+  Sys.sleep(3)
+  
+}
+
+  
+get.stock.data <- function(Stock_Code){
+
+  Stock_Price_Data <- getSymbols(Stock_Code, from = "2019-01-01", to = Sys.Date()-1, auto.assign = F)
+  
+  Stock_Price_Close <- Stock_Price_Data[,4]
+  
+  Convert_to_Return <- dailyReturn(Stock_Price_Close, type="log") 
+  
+  Stock_Price_Return <- fortify.zoo(Convert_to_Return) 
+  
+  colnames(Stock_Price_Return) = c("Date", "Return")
+  
+  return(Stock_Price_Return)
+  
+}
+
+assign("Stock_Price_Return", get.stock.data(Stock_Code = "AAPL")) 
+
+FF5 <- download_french_data("Fama/French 5 Factors (2x3)") 
+FF_5Factors <- FF5$subsets$data[[1]] %>% 
+  na.omit() %>% 
+  mutate(date = sub("(\\d{4})", "\\1-", date)) %>% 
+  mutate(date = as.Date(as.yearmon(date), frac = 1)) 
+colnames(FF_5Factors)[1] <-  "Date"
+colnames(FF_5Factors)[2] <-  "Mkt.RF"
+
+Attr_Data <- merge(Stock_Price_Return, FF_5Factors, by = "Date")
+Attr_Data$ExcessReturn <- Attr_Data$Return - Attr_Data$RF
+Attr_Reg <- lm(ExcessReturn ~ Mkt.RF + SMB + HML + RMW + CMA, data = Attr_Data)
+
+```
+
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+### Small-Minus-Big
+
+```{r}
+ggplot(FF_SMB_1_MO, aes(x = date, y = value, group = key)) +
+  geom_line(aes(color = key), size = 1) +
+  theme_bw() +
+  xlab('') + ylab('Cumulative Logarithmic Return') + labs(fill = "")+
+  theme(legend.title = element_blank(), legend.direction='vertical',
+          legend.text = element_text(size = 7)) +
+  scale_color_brewer(palette='Set3') +
+  guides(color = guide_legend(reverse = TRUE))  
+
+```
+
+### High-Minus-Low
+
+```{r}
+ggplot(FF_HML_1_MO, aes(x = date, y = value, group = key)) +
+  geom_line(aes(color = key), size = 1) +
+  theme_bw() +
+  xlab('') + ylab('Cumulative Logarithmic Return') + labs(fill = "")+
+  theme(legend.title = element_blank(), legend.direction='vertical',
+          legend.text = element_text(size = 7)) +
+  scale_color_brewer(palette='Set3') +
+  guides(color = guide_legend(reverse = TRUE))  
+```
+
+
+Column {data-width=500 }
+-----------------------------------------------------------------------
+
+### Robus-Minus-Weak
+```{r}
+ggplot(FF_RMW_1_MO, aes(x = date, y = value, group = key)) +
+  geom_line(aes(color = key), size = 1) +
+  theme_bw() +
+  xlab('') + ylab('Cumulative Logarithmic Return') + labs(fill = "")+
+  theme(legend.title = element_blank(), legend.direction='vertical',
+          legend.text = element_text(size = 7)) +
+  scale_color_brewer(palette='Set3') +
+  guides(color = guide_legend(reverse = TRUE))  
+
+```
+
+### Conservative-Minus-Aggressive
+
+```{r}
+ggplot(FF_CMA_1_MO, aes(x = date, y = value, group = key)) +
+  geom_line(aes(color = key), size = 1) +
+  theme_bw() +
+  xlab('') + ylab('Cumulative Logarithmic Return') + labs(fill = "")+
+  theme(legend.title = element_blank(), legend.direction='vertical',
+          legend.text = element_text(size = 7)) +
+  scale_color_brewer(palette='Set3') +
+  guides(color = guide_legend(reverse = TRUE))  
+
+```
+
+F.F. Regression
+===
+
+### Regression Analysis 
+Apple (AAPL)
+```{r}
+tab_model(Attr_Reg)
+
+```
+
+F.F. Regression Plots
+===
+
+### Residual Analysis
+Apple (AAPL)
+```{r}
+par(mfrow = c(2,2))
+plot(Attr_Reg)
+
+```
