@@ -104,11 +104,9 @@ View(Stock_Price_Return)
 
 ### [F.F. 5 Factors] ###
 
-FF5 <- download_french_data("Fama/French 5 Factors (2x3)") 
-FF_5Factors <- FF5$subsets$data[[1]] %>% 
-  na.omit() %>% 
-  mutate(date = sub("(\\d{4})", "\\1-", date)) %>% 
-  mutate(date = as.Date(as.yearmon(date), frac = 1)) 
+FF5 <- download_french_data("Fama/French 5 Factors (2x3) [Daily]") 
+FF_5Factors <- FF5$subsets$data[[1]] %>%  na.omit() 
+FF_5Factors$date <- as.Date(strptime(FF_5Factors$date, format = "%Y%m%d"))
 colnames(FF_5Factors)[1] <-  "Date"
 colnames(FF_5Factors)[2] <-  "Mkt.RF"
 
@@ -125,7 +123,7 @@ plot(Attr_Reg)
 
 ### [Regression Table] ### 
 
-stargazer(Attr_Reg, summary = T, title = "Fama-French Regression OLS", type = "latex")
+stargazer(Attr_Reg, summary = T, title = "Fama-French Regression OLS", type = "text")
 
 
 # Find Factor List here: get_french_data_list()

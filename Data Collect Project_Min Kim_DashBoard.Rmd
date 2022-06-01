@@ -5,9 +5,15 @@ output:
     orientation: columns
     vertical_layout: fill
 ---
+<style type="text/css">
+  body{
+  font-size: 8pt;
+}
+</style>
+
 F.F. Factor Returns
 ===
-
+U.S. Stock Market
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
@@ -91,11 +97,9 @@ get.stock.data <- function(Stock_Code){
 
 assign("Stock_Price_Return", get.stock.data(Stock_Code = "AAPL")) 
 
-FF5 <- download_french_data("Fama/French 5 Factors (2x3)") 
-FF_5Factors <- FF5$subsets$data[[1]] %>% 
-  na.omit() %>% 
-  mutate(date = sub("(\\d{4})", "\\1-", date)) %>% 
-  mutate(date = as.Date(as.yearmon(date), frac = 1)) 
+FF5 <- download_french_data("Fama/French 5 Factors (2x3) [Daily]") 
+FF_5Factors <- FF5$subsets$data[[1]] %>%  na.omit() 
+FF_5Factors$date <- as.Date(strptime(FF_5Factors$date, format = "%Y%m%d"))
 colnames(FF_5Factors)[1] <-  "Date"
 colnames(FF_5Factors)[2] <-  "Mkt.RF"
 
@@ -150,7 +154,6 @@ ggplot(FF_RMW_1_MO, aes(x = date, y = value, group = key)) +
           legend.text = element_text(size = 7)) +
   scale_color_brewer(palette='Set3') +
   guides(color = guide_legend(reverse = TRUE))  
-
 ```
 
 ### Conservative-Minus-Aggressive
@@ -173,7 +176,7 @@ F.F. Regression
 ### Regression Analysis 
 Apple (AAPL)
 ```{r}
-tab_model(Attr_Reg)
+stargazer(Attr_Reg, summary = T, title = "Fama-French Regression OLS", type = "text")
 
 ```
 
